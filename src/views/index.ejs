@@ -1,0 +1,60 @@
+<!-- views/index.ejs -->
+
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mik - Admin</title>
+</head>
+
+<body>
+  <h1>Bienvenido</h1>
+  <p>Lorem, ipsum dolor sit amet consectetur adipisicing elit. Ipsum harum iste quasi libero, voluptatem impedit vero fuga adipisci reprehenderit rem, odit tenetur modi. Totam sapiente accusamus expedita, perferendis rem unde.</p>
+  <button id="btn">Solicitar Mik</button>
+
+  <code id="main-code">
+
+  </code>
+
+  <script>
+    const btn = document.getElementById('btn')
+    const code = document.getElementById('main-code')
+
+    function getDataApi() {
+      // URL completa de la API
+      const DOMINIO = "http://localhost:3000";
+      const ENDPOINT = '/api/v1/users/'; 
+      const URL = DOMINIO + ENDPOINT;
+      // Reemplaza 'tu-endpoint' con el endpoint específico de tu API
+
+      // Realizar la petición GET usando fetch
+      fetch(URL)
+        .then(response => {
+          // Verifica si la respuesta fue exitosa (código de estado 200-299)
+          if (!response.ok) {
+            throw new Error(`Error en la petición: ${response.status} ${response.statusText}`);
+          }
+
+          // Parsea la respuesta como JSON y devuelve la promesa resultante
+          return response.json();
+        })
+        .then(data => {
+          // Maneja los datos obtenidos de la API
+          console.log('Datos obtenidos:', data);
+          code.textContent = JSON.stringify(data)
+        })
+        .catch(error => {
+          // Maneja los errores en la petición
+          console.error('Error en la petición:', error.message);
+          code.textContent = JSON.stringify(error.message)
+        });
+    }
+
+
+    btn.addEventListener('click',() => getDataApi())
+  </script>
+</body>
+
+</html>
