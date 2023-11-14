@@ -23,8 +23,8 @@
     const code = document.getElementById('main-code')
 
     function getDataApi() {
-      // URL completa de la API
-      const DOMINIO = "http://localhost:3000";
+      const DOMINIO = "http://"+window.location.hostname+":"+window.location.port;
+      
       const ENDPOINT = '/api/v1/users/'; 
       const URL = DOMINIO + ENDPOINT;
       // Reemplaza 'tu-endpoint' con el endpoint específico de tu API

@@ -1,4 +1,4 @@
-const { MikroClient} = require('mikro-client');
+const { MikroClient} = require("./mikrotik-client.js");
 
 
 const CONFIG = {
