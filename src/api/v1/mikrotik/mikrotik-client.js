@@ -3,72 +3,93 @@ const net = require("net");
 
 class MikroClient {
     constructor(options) {
-        this.loged = false;
         // initialize properties
-        this.host = (options && options.host) || '192.168.88.1';
-        this.port = (options && options.port) || 8728;
-        this.username = (options && options.username) || 'admin';
-        this.password = (options && options.password) || '';
-        // por defecto el timeout es de 3 segundos osea espera 5 segundos para recibir la dataBUFFER
-        this.timeout = (options && options.timeout) || 3000;
+        this.host = options?.host || '192.168.88.1';
+        this.port = options?.port || 8728;
+        this.username = options?.username || 'admin';
+        this.password = options?.password || '';
+        this.timeout = options?.timeout || 3000;
+        this.loged = false;
         this.sk = new net.Socket();
-        // inicializar el socket
-        this.sk.connect(this.port, this.host);
+        this.error = null; // Variable para almacenar errores
     }
 
-    // método para loguear al mikrotik
+    initializeSocket() {
+        try {
+            this.sk.connect(this.port, this.host);
+        } catch (error) {
+            this.error = { error: true, message: `Error al conectar con el servidor: ${error.message}` };
+            this.sk.destroy(); // Cerrar el socket en caso de error
+        }
+        this.sk.on('error', (error) => {
+            this.error = { error: true, message: `Error de conexión: ${error.message}` };
+            this.sk.destroy(); // Cerrar el socket en caso de error
+        });
+    
+    }
+    
+
+    // Método para loguear al mikrotik
     async login() {
-        return new Promise((resolve, reject) => {
-            try {
-                const resp = this.writeSentence([
-                    '/login',
-                    `=name=${this.username}`,
-                    `=password=${this.password}`,
-                ]);
-                if (resp.tag === '!trap') {
-                    this.loged = false;
-                    resolve(false);
-                }
-                this.loged = true;
-                resolve(true);
-            } catch (error) {
+        try {
+            await this.initializeSocket();
+
+            const resp = await this.writeSentence([
+                '/login',
+                `=name=${this.username}`,
+                `=password=${this.password}`,
+            ]);
+
+            if (resp.tag === '!trap') {
                 this.loged = false;
-                reject('Error al loguear: ' + error);
+                return { success: false, error: { message: 'Error en el login' } };
             }
-        });
+
+            this.loged = true;
+            return { success: true, data: resp.data };
+        } catch (error) {
+            this.loged = false;
+            return { success: false, error: { message: `Error al loguear: ${error.message}` } };
+        }
     }
 
-    // método para enviar las sentencias nativas de mikrotik
-    talk(words, type) {
-        return new Promise((resolve, reject) => {
-            (async () => {
-                // loguear al mikrotik
-                if ((await this.login()) && this.loged) {
-                    // esperar medio segundo para enviar la data
-                    setTimeout(async () => {
-                        // si no se envía nada retorna un array vacío y emitir un error
-                        if (this.writeSentence(words) === 0) {
-                            reject(' No se envió nada...');
-                        }
-                    }, 500);
-                    const data = await this.readSentence();
-                    if (data.error) {
-                        console.error(data.message);
-                        reject(data.message);
-                        return;
-                    }
-                    if (type === 'object') {
-                        resolve(this.toObj(data.data));
-                    }
-                    this.close();
-                    resolve(data.data);
-                } else {
-                    reject('Error al loguear...');
-                }
-            })();
-        });
+    // Método para enviar las sentencias nativas de Mikrotik
+    async talk(words, type) {
+        try {
+            const loginResult = await this.login();
+
+            if (!loginResult.success) {
+                return loginResult; // Devolver error si el login no fue exitoso
+            }
+
+            // Esperar medio segundo para enviar la data
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const sentCount = this.writeSentence(words);
+
+            if (sentCount === 0) {
+                return { success: false, error: { message: 'No se envió nada...' } };
+            }
+
+            const data = await this.readSentence();
+
+            if (data.error) {
+                return { success: false, error: { message: data.message } };
+            }
+
+            if (type === 'object') {
+                return { success: true, data: this.toObj(data.data) };
+            }
+
+            this.close();
+            return { success: true, data: data.data };
+        } catch (error) {
+            return { success: false, error: { message: `Error en la comunicación con el servidor: ${error.message}` } };
+        }
     }
 
+
+    
     // método para convertir la data en un objeto más fácil de manejar
     toObj(data) {
         // eliminar los strings vacíos del array y los arrays con !done
@@ -136,6 +157,8 @@ class MikroClient {
             setTimeout(() => {
                 // si el buffer está vacío se devuelve un objeto de error
                 if (buffer.length === 0) {
+                    this.error ?
+                    resolve(this.error) :
                     resolve({ error: true, message: 'No se recibió data' });
                 }
                 // si el buffer tiene data se devuelve el buffer
